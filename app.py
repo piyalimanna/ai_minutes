@@ -6,6 +6,8 @@ import base64
 from datetime import datetime, timedelta
 import re
 import time
+import tempfile
+import os
 
 # Page configuration
 st.set_page_config(
@@ -71,57 +73,88 @@ if 'generated_mom' not in st.session_state:
 if 'api_key_set' not in st.session_state:
     st.session_state.api_key_set = False
 
-# Mock transcript data for demo purposes
-DEMO_TRANSCRIPT = [
-    {"start_time": 0, "end_time": 15, "text": "Good morning everyone. Thank you for joining today's project review meeting. I'm Sarah from the product team."},
-    {"start_time": 15, "end_time": 35, "text": "Today we'll be discussing the Q2 roadmap, current sprint progress, and addressing the client feedback from last week."},
-    {"start_time": 35, "end_time": 55, "text": "Mike, can you start us off with the development update? How are we tracking against our sprint goals?"},
-    {"start_time": 55, "end_time": 85, "text": "Sure Sarah. We've completed 8 out of 10 user stories this sprint. The remaining two are the authentication module and the reporting dashboard."},
-    {"start_time": 85, "end_time": 110, "text": "The authentication is 90% done, just pending security review. The dashboard needs another 3 days of work."},
-    {"start_time": 110, "end_time": 140, "text": "That's great progress Mike. Lisa, what's the feedback from the client demo last Friday?"},
-    {"start_time": 140, "end_time": 170, "text": "The client loved the new UI improvements. They specifically mentioned the faster load times and cleaner interface."},
-    {"start_time": 170, "end_time": 200, "text": "However, they requested two new features: bulk data import and email notifications for critical alerts."},
-    {"start_time": 200, "end_time": 230, "text": "I think we can accommodate the email notifications in the current sprint, but bulk import might need to go to next sprint."},
-    {"start_time": 230, "end_time": 260, "text": "Agreed. Let's prioritize the email notifications. Tom, can you handle the technical specification for that?"},
-    {"start_time": 260, "end_time": 290, "text": "Absolutely. I'll have the tech spec ready by Wednesday and we can review it in Thursday's standup."},
-    {"start_time": 290, "end_time": 320, "text": "Perfect. Any other concerns or blockers? We have the budget review next week so we need to finalize our Q3 estimates."},
-    {"start_time": 320, "end_time": 350, "text": "I'll prepare the development effort estimates and send them to Sarah by end of day tomorrow."},
-    {"start_time": 350, "end_time": 370, "text": "Great. Let's wrap up. Thanks everyone for the productive meeting. Next review is scheduled for Friday."}
-]
-
 def format_time(seconds):
     """Convert seconds to MM:SS format"""
     minutes = int(seconds // 60)
     seconds = int(seconds % 60)
     return f"{minutes:02d}:{seconds:02d}"
 
-def mock_transcribe_audio(audio_file):
-    """Mock transcription function - in real app, this would call OpenAI Whisper"""
-    # Show that we're processing the actual file
-    st.info(f"📁 Processing file: {audio_file.name} ({audio_file.size} bytes)")
-    
-    # Simulate processing time based on file size
-    processing_time = min(5, max(2, audio_file.size / 1000000))  # 2-5 seconds based on file size
-    
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for i in range(100):
-        time.sleep(processing_time / 100)
-        progress_bar.progress(i + 1)
-        if i < 30:
-            status_text.text("🎵 Analyzing audio format...")
-        elif i < 60:
-            status_text.text("🔊 Processing audio segments...")
-        elif i < 90:
-            status_text.text("🤖 Generating transcript...")
-        else:
-            status_text.text("✨ Finalizing results...")
-    
-    status_text.text("✅ Transcription complete!")
-    time.sleep(0.5)  # Brief pause to show completion
-    
-    return DEMO_TRANSCRIPT
+def real_transcribe_audio(audio_file, api_key):
+    """Real transcription function using OpenAI Whisper API"""
+    try:
+        # Set up OpenAI client
+        client = openai.OpenAI(api_key=api_key)
+        
+        # Show processing status
+        st.info(f"📁 Processing file: {audio_file.name} ({audio_file.size} bytes)")
+        
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Create a temporary file to save the uploaded audio
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(audio_file.name)[1]) as tmp_file:
+            tmp_file.write(audio_file.read())
+            tmp_file_path = tmp_file.name
+        
+        try:
+            status_text.text("🎵 Uploading to OpenAI Whisper...")
+            progress_bar.progress(20)
+            
+            # Open the temporary file for transcription
+            with open(tmp_file_path, "rb") as audio_file_obj:
+                # Call OpenAI Whisper API with timestamp support
+                status_text.text("🤖 Transcribing with OpenAI Whisper...")
+                progress_bar.progress(50)
+                
+                transcript = client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file_obj,
+                    response_format="verbose_json",
+                    timestamp_granularities=["segment"]
+                )
+                
+                progress_bar.progress(80)
+                status_text.text("📝 Processing transcript segments...")
+                
+                # Convert OpenAI response to our format
+                transcript_data = []
+                if hasattr(transcript, 'segments') and transcript.segments:
+                    for segment in transcript.segments:
+                        transcript_data.append({
+                            "start_time": segment.start,
+                            "end_time": segment.end,
+                            "text": segment.text.strip()
+                        })
+                else:
+                    # Fallback: create single segment if no segments returned
+                    transcript_data.append({
+                        "start_time": 0,
+                        "end_time": 60,  # Placeholder duration
+                        "text": transcript.text
+                    })
+                
+                progress_bar.progress(100)
+                status_text.text("✅ Transcription complete!")
+                
+                return transcript_data
+                
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_file_path):
+                os.unlink(tmp_file_path)
+                
+    except openai.AuthenticationError:
+        st.error("❌ Invalid OpenAI API key. Please check your API key.")
+        return None
+    except openai.RateLimitError:
+        st.error("❌ Rate limit exceeded. Please try again later.")
+        return None
+    except openai.APIError as e:
+        st.error(f"❌ OpenAI API error: {str(e)}")
+        return None
+    except Exception as e:
+        st.error(f"❌ Transcription failed: {str(e)}")
+        return None
 
 def generate_mom_prompt(transcript, context, previous_meeting, tone, audience, goal):
     """Generate the prompt for MoM creation"""
@@ -169,90 +202,86 @@ Please generate a comprehensive MoM that includes:
 6. Follow-up Meeting Details
 
 Format the output in a professional, easy-to-read structure appropriate for the specified audience and tone.
+Use markdown formatting for better readability.
 """
     
     return prompt
 
-def mock_generate_mom(prompt):
-    """Mock MoM generation - in real app, this would call OpenAI GPT"""
-    
-    # Show progress during generation
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    steps = [
-        "🤖 Analyzing meeting transcript...",
-        "📝 Extracting key discussion points...",
-        "🎯 Identifying action items...",
-        "📋 Structuring meeting summary...",
-        "✨ Formatting final document..."
-    ]
-    
-    for i, step in enumerate(steps):
-        status_text.text(step)
-        progress_bar.progress((i + 1) * 20)
-        time.sleep(0.8)  # Slightly faster for better UX
-    
-    status_text.text("✅ Generation complete!")
-    time.sleep(0.3)
-    
-    # This is a mock response - in real app, you'd call OpenAI API
-    mock_response = """
-# Minutes of Meeting - Project Review
+def real_generate_mom(prompt, api_key):
+    """Real MoM generation using OpenAI GPT API"""
+    try:
+        # Set up OpenAI client
+        client = openai.OpenAI(api_key=api_key)
+        
+        # Show progress during generation
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        status_text.text("🤖 Starting MoM generation...")
+        progress_bar.progress(20)
+        
+        status_text.text("📝 Analyzing meeting content...")
+        progress_bar.progress(40)
+        
+        # Call OpenAI GPT API
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # You can also use "gpt-4" for better results
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a professional meeting secretary who creates clear, comprehensive Minutes of Meeting documents. Always format output in markdown for better readability."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            max_tokens=2000,
+            temperature=0.3  # Lower temperature for more consistent, professional output
+        )
+        
+        progress_bar.progress(80)
+        status_text.text("🎯 Formatting final document...")
+        
+        # Extract the generated MoM
+        generated_mom = response.choices[0].message.content
+        
+        progress_bar.progress(100)
+        status_text.text("✅ Generation complete!")
+        time.sleep(0.5)  # Brief pause to show completion
+        
+        return generated_mom
+        
+    except openai.AuthenticationError:
+        st.error("❌ Invalid OpenAI API key. Please check your API key.")
+        return None
+    except openai.RateLimitError:
+        st.error("❌ Rate limit exceeded. Please try again later.")
+        return None
+    except openai.APIError as e:
+        st.error(f"❌ OpenAI API error: {str(e)}")
+        return None
+    except Exception as e:
+        st.error(f"❌ MoM generation failed: {str(e)}")
+        return None
 
-**Date:** June 15, 2025  
-**Duration:** 6 minutes 10 seconds  
-**Attendees:** Sarah (Product Team), Mike (Development), Lisa (Client Relations), Tom (Technical Lead)  
-**Meeting Type:** Project Review and Planning  
-
-## Meeting Overview
-Quarterly project review focusing on Q2 roadmap progress, sprint status, and client feedback integration.
-
-## Key Discussion Points
-
-### Sprint Progress Update
-- **Current Status:** 8 out of 10 user stories completed (80% completion rate)
-- **Pending Items:** 
-  - Authentication module (90% complete, pending security review)
-  - Reporting dashboard (3 days of work remaining)
-
-### Client Feedback Summary
-- **Positive Reception:** UI improvements well-received, particularly load time optimization and interface design
-- **New Requirements:** 
-  - Bulk data import functionality
-  - Email notifications for critical alerts
-
-### Resource Allocation
-- Email notifications approved for current sprint
-- Bulk import deferred to next sprint due to complexity
-
-## Decisions Made
-1. **Prioritization:** Email notifications take precedence over bulk import
-2. **Sprint Scope:** Authentication and dashboard completion remains priority
-3. **Q3 Planning:** Budget review scheduled for next week
-
-## Action Items
-| Task | Owner | Deadline | Status |
-|------|-------|----------|--------|
-| Complete authentication security review | Mike | This Sprint | In Progress |
-| Finish reporting dashboard | Mike | 3 days | Pending |
-| Technical specification for email notifications | Tom | Wednesday | Assigned |
-| Review email notification spec | Team | Thursday Standup | Scheduled |
-| Prepare Q3 development estimates | Mike | Tomorrow EOD | Assigned |
-
-## Next Steps
-- Thursday standup: Review email notification technical specification
-- Friday: Next project review meeting
-- Next week: Budget review and Q3 planning finalization
-
-## Meeting Outcome
-Productive session with clear progress tracking and realistic timeline adjustments. Client requirements successfully integrated into sprint planning.
-
----
-*Generated by AI MoM Assistant*
-"""
-    
-    return mock_response
+# Demo transcript data (kept as fallback)
+DEMO_TRANSCRIPT = [
+    {"start_time": 0, "end_time": 15, "text": "Good morning everyone. Thank you for joining today's project review meeting. I'm Sarah from the product team."},
+    {"start_time": 15, "end_time": 35, "text": "Today we'll be discussing the Q2 roadmap, current sprint progress, and addressing the client feedback from last week."},
+    {"start_time": 35, "end_time": 55, "text": "Mike, can you start us off with the development update? How are we tracking against our sprint goals?"},
+    {"start_time": 55, "end_time": 85, "text": "Sure Sarah. We've completed 8 out of 10 user stories this sprint. The remaining two are the authentication module and the reporting dashboard."},
+    {"start_time": 85, "end_time": 110, "text": "The authentication is 90% done, just pending security review. The dashboard needs another 3 days of work."},
+    {"start_time": 110, "end_time": 140, "text": "That's great progress Mike. Lisa, what's the feedback from the client demo last Friday?"},
+    {"start_time": 140, "end_time": 170, "text": "The client loved the new UI improvements. They specifically mentioned the faster load times and cleaner interface."},
+    {"start_time": 170, "end_time": 200, "text": "However, they requested two new features: bulk data import and email notifications for critical alerts."},
+    {"start_time": 200, "end_time": 230, "text": "I think we can accommodate the email notifications in the current sprint, but bulk import might need to go to next sprint."},
+    {"start_time": 230, "end_time": 260, "text": "Agreed. Let's prioritize the email notifications. Tom, can you handle the technical specification for that?"},
+    {"start_time": 260, "end_time": 290, "text": "Absolutely. I'll have the tech spec ready by Wednesday and we can review it in Thursday's standup."},
+    {"start_time": 290, "end_time": 320, "text": "Perfect. Any other concerns or blockers? We have the budget review next week so we need to finalize our Q3 estimates."},
+    {"start_time": 320, "end_time": 350, "text": "I'll prepare the development effort estimates and send them to Sarah by end of day tomorrow."},
+    {"start_time": 350, "end_time": 370, "text": "Great. Let's wrap up. Thanks everyone for the productive meeting. Next review is scheduled for Friday."}
+]
 
 # Main App Interface
 st.markdown("<h1 class='main-header'>🤖 AI MoM Assistant</h1>", unsafe_allow_html=True)
@@ -262,13 +291,40 @@ st.markdown("<p style='text-align: center; color: #666;'>Transform meeting recor
 with st.sidebar:
     st.markdown("### ⚙️ Configuration")
     
-    # API Key Input (for demo, we'll use mock functions)
-    api_key = st.text_input("OpenAI API Key", type="password", help="Enter your OpenAI API key")
+    # API Key Input
+    api_key = st.text_input(
+        "OpenAI API Key", 
+        type="password", 
+        help="Enter your OpenAI API key to enable real transcription and MoM generation"
+    )
+    
     if api_key:
-        st.session_state.api_key_set = True
-        st.success("✅ API Key Set")
+        # Test API key validity
+        try:
+            test_client = openai.OpenAI(api_key=api_key)
+            # Simple test call to validate key
+            test_response = test_client.models.list()
+            st.session_state.api_key_set = True
+            st.success("✅ API Key Valid")
+        except:
+            st.error("❌ Invalid API Key")
+            st.session_state.api_key_set = False
     else:
-        st.info("💡 Using demo mode with mock data")
+        st.warning("⚠️ Enter API key for real functionality")
+        st.session_state.api_key_set = False
+    
+    if not api_key:
+        st.info("💡 Demo mode available with sample data")
+    
+    st.markdown("---")
+    st.markdown("### 💰 API Usage Costs")
+    st.markdown("""
+    **Whisper API:** ~$0.006/minute
+    **GPT-3.5-turbo:** ~$0.002/1K tokens
+    **GPT-4:** ~$0.06/1K tokens
+    
+    *Typical 30-min meeting: ~$0.20-$2.00*
+    """)
     
     st.markdown("---")
     st.markdown("### 📋 Quick Actions")
@@ -281,12 +337,13 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📖 Instructions")
     st.markdown("""
-    1. **Upload/Record** audio file
-    2. **Review** transcript segments
-    3. **Select** time range
-    4. **Configure** context & tone
-    5. **Generate** MoM
-    6. **Export** results
+    1. **Enter API Key** above
+    2. **Upload/Record** audio file
+    3. **Review** transcript segments
+    4. **Select** time range
+    5. **Configure** context & tone
+    6. **Generate** MoM
+    7. **Export** results
     """)
     
     # Workflow status checker
@@ -295,6 +352,11 @@ with st.sidebar:
     
     # Check current progress
     progress_items = []
+    if st.session_state.api_key_set:
+        progress_items.append("✅ API Key valid")
+    else:
+        progress_items.append("⏳ Enter API Key")
+    
     if st.session_state.get('transcript_data'):
         progress_items.append("✅ Transcript loaded")
     else:
@@ -346,8 +408,8 @@ with tab1:
         st.markdown("#### 📁 Upload Audio File")
         uploaded_file = st.file_uploader(
             "Choose an audio file",
-            type=['mp3', 'wav', 'm4a', 'ogg'],
-            help="Upload meeting recording in MP3, WAV, M4A, or OGG format"
+            type=['mp3', 'wav', 'm4a', 'ogg', 'mp4', 'mpeg', 'mpga', 'webm'],
+            help="Upload meeting recording. Supported: MP3, WAV, M4A, OGG, MP4, MPEG, MPGA, WEBM"
         )
         
         if uploaded_file is not None:
@@ -363,36 +425,52 @@ with tab1:
             for key, value in file_details.items():
                 st.write(f"**{key}:** {value}")
             
-            st.audio(uploaded_file)
-            
-            # Transcription button with better state management
-            transcribe_button = st.button("🔄 Transcribe Audio", type="primary", key="transcribe_btn")
-            
-            if transcribe_button:
-                try:
-                    # Clear any previous transcript
-                    if 'transcript_data' in st.session_state:
-                        del st.session_state.transcript_data
+            # Check file size limit (OpenAI has 25MB limit)
+            if uploaded_file.size > 25 * 1024 * 1024:
+                st.error("❌ File too large! OpenAI Whisper has a 25MB limit. Please compress your audio file.")
+            else:
+                st.audio(uploaded_file)
+                
+                # Transcription button
+                if st.session_state.api_key_set:
+                    transcribe_button = st.button("🔄 Transcribe Audio with OpenAI Whisper", type="primary", key="transcribe_btn")
                     
-                    # Create a container for the transcription process
-                    transcription_container = st.container()
-                    
-                    with transcription_container:
-                        st.info("🎯 Starting transcription process...")
-                        
-                        # Call the mock transcription function
-                        st.session_state.transcript_data = mock_transcribe_audio(uploaded_file)
-                        
-                        # Success message
-                        st.success("✅ Transcription completed successfully!")
-                        st.balloons()
-                        
-                        # Auto-advance to transcript tab
-                        st.info("👉 Check the 'Transcript' tab to review your transcription!")
-                        
-                except Exception as e:
-                    st.error(f"❌ Transcription failed: {str(e)}")
-                    st.error("Please try uploading the file again or use the demo data.")
+                    if transcribe_button:
+                        try:
+                            # Clear any previous transcript
+                            if 'transcript_data' in st.session_state:
+                                del st.session_state.transcript_data
+                            
+                            # Create a container for the transcription process
+                            transcription_container = st.container()
+                            
+                            with transcription_container:
+                                st.info("🎯 Starting real transcription with OpenAI Whisper...")
+                                
+                                # Call the real transcription function
+                                result = real_transcribe_audio(uploaded_file, api_key)
+                                
+                                if result:
+                                    st.session_state.transcript_data = result
+                                    
+                                    # Success message
+                                    st.success("✅ Transcription completed successfully!")
+                                    st.balloons()
+                                    
+                                    # Show transcript stats
+                                    st.info(f"📊 Generated {len(result)} transcript segments")
+                                    
+                                    # Auto-advance to transcript tab
+                                    st.info("👉 Check the 'Transcript' tab to review your transcription!")
+                                else:
+                                    st.error("❌ Transcription failed. Please check your API key and try again.")
+                                    
+                        except Exception as e:
+                            st.error(f"❌ Transcription failed: {str(e)}")
+                            st.error("Please check your API key and try again.")
+                else:
+                    st.warning("⚠️ Please enter a valid OpenAI API key to use real transcription")
+                    st.info("💡 You can use the demo data button below for testing")
         
         else:
             st.info("👆 Please upload an audio file to start transcription")
@@ -459,10 +537,11 @@ webrtc_streamer(
             """)
         
         st.markdown("---")
-        st.markdown("**💡 For now, use:**")
-        st.markdown("- 📁 Audio file upload (fully working)")
+        st.markdown("**💡 Current Options:**")
+        st.markdown("- 📁 Audio file upload ✅ **REAL API**")
         st.markdown("- 📊 Demo transcript (for testing)")
-        st.markdown("- 🎵 Any MP3/WAV file you have")
+        st.markdown("- 🎵 Upload any audio format")
+        st.markdown("- 🤖 Real OpenAI Whisper transcription")
 
 with tab2:
     st.markdown("<h3 class='section-header'>Transcript Review</h3>", unsafe_allow_html=True)
@@ -510,6 +589,19 @@ with tab2:
                 """, unsafe_allow_html=True)
             
             st.session_state.selected_transcript = selected_text.strip()
+            
+            # Show word count and estimated cost
+            word_count = len(selected_text.split())
+            estimated_tokens = word_count * 1.3  # Rough estimate
+            estimated_cost = estimated_tokens / 1000 * 0.002  # GPT-3.5-turbo pricing
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Words Selected", word_count)
+            with col2:
+                st.metric("Est. Tokens", f"{estimated_tokens:.0f}")
+            with col3:
+                st.metric("Est. Cost", f"${estimated_cost:.4f}")
         else:
             st.warning("⚠️ No segments selected in this time range")
     else:
@@ -558,13 +650,22 @@ with tab3:
             help="Choose the appropriate tone for your audience"
         )
         
+        # Model selection
+        st.markdown("#### 🤖 AI Model")
+        model_choice = st.selectbox(
+            "OpenAI Model",
+            ["gpt-3.5-turbo", "gpt-4"],
+            help="GPT-4 provides better quality but costs more"
+        )
+        
         # Store configuration in session state
         st.session_state.config = {
             'context': meeting_context,
             'previous_meeting': previous_meeting,
             'audience': audience,
             'goal': meeting_goal,
-            'tone': tone
+            'tone': tone,
+            'model': model_choice
         }
 
 with tab4:
@@ -574,15 +675,15 @@ with tab4:
         config = st.session_state.config
         
         # Show summary of configuration
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Audience", config['audience'])
         with col2:
             st.metric("Tone", config['tone'])
         with col3:
+            st.metric("Model", config.get('model', 'gpt-3.5-turbo'))
+        with col4:
             st.metric("Transcript Length", f"{len(st.session_state.selected_transcript.split())} words")
-        
-        st.markdown("#### 🔧 Final Prompt Configuration")
         
         # Advanced options
         with st.expander("⚙️ Advanced Options"):
@@ -596,202 +697,28 @@ with tab4:
             include_sentiment = st.checkbox("Include Sentiment Analysis", value=False)
         
         # Generate MoM
-        generate_button = st.button("✨ Generate Minutes of Meeting", type="primary", key="generate_mom_btn")
-        
-        if generate_button:
-            if not config['context']:
-                st.error("❌ Please provide meeting context in the Configuration tab")
-            else:
-                # Create containers for the generation process
-                generation_container = st.container()
-                
-                with generation_container:
-                    st.info("🚀 Starting MoM generation...")
+        if st.session_state.api_key_set:
+            generate_button = st.button("✨ Generate Minutes of Meeting with OpenAI", type="primary", key="generate_mom_btn")
+            
+            if generate_button:
+                if not config['context']:
+                    st.error("❌ Please provide meeting context in the Configuration tab")
+                else:
+                    # Create containers for the generation process
+                    generation_container = st.container()
                     
-                    prompt = generate_mom_prompt(
-                        st.session_state.selected_transcript,
-                        config['context'],
-                        config['previous_meeting'],
-                        config['tone'],
-                        config['audience'],
-                        config['goal']
-                    )
-                    
-                    # Show progress during generation
-                    progress_container = st.container()
-                    with progress_container:
-                        st.session_state.generated_mom = mock_generate_mom(prompt)
-                    
-                    st.success("✅ Minutes of Meeting generated successfully!")
-                    st.balloons()
-                    
-                    # Force immediate display of results
-                    st.markdown("#### 📋 Your Generated Minutes of Meeting")
-                    st.markdown("---")
-        
-        # Always show generated MoM if it exists
-        if st.session_state.generated_mom:
-            st.markdown("#### 📋 Generated Minutes of Meeting")
-            
-            # Create a nice container for the MoM
-            mom_container = st.container()
-            with mom_container:
-                st.markdown(f"""
-                <div class='mom-output'>
-{st.session_state.generated_mom}
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Add a copy button for convenience
-                col1, col2 = st.columns([3, 1])
-                with col2:
-                    st.markdown("**Quick Actions:**")
-                    if st.button("📋 Copy Text", key="quick_copy"):
-                        st.info("💡 Text is displayed above - select and copy!")
-                    if st.button("📥 Go to Export", key="go_to_export"):
-                        st.info("👉 Check the 'Export' tab for download options!")
-            
-            # Refinement options
-            st.markdown("#### 🔄 Refine Results")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("📝 Make More Detailed"):
-                    st.info("🔄 Regenerating with more detail...")
-                    # In real app, modify prompt and regenerate
-                
-                if st.button("⚡ Make More Concise"):
-                    st.info("🔄 Regenerating more concisely...")
-                    # In real app, modify prompt and regenerate
-            
-            with col2:
-                if st.button("🎯 Focus on Action Items"):
-                    st.info("🔄 Regenerating with action item focus...")
-                    # In real app, modify prompt and regenerate
-                
-                if st.button("📊 Add More Analysis"):
-                    st.info("🔄 Adding analytical insights...")
-                    # In real app, modify prompt and regenerate
-    
-    else:
-        if not st.session_state.selected_transcript:
-            st.info("👆 Please select a transcript segment in the Transcript tab")
-        else:
-            st.info("👆 Please configure meeting details in the Configuration tab")
-
-with tab5:
-    st.markdown("<h3 class='section-header'>Export Results</h3>", unsafe_allow_html=True)
-    
-    if st.session_state.generated_mom:
-        st.success("🎉 **MoM Generated Successfully!** All export options are now available.")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("#### 📋 Copy to Clipboard")
-            st.text_area(
-                "Generated MoM (Select all text and copy)",
-                value=st.session_state.generated_mom,
-                height=300,
-                help="Select all text (Ctrl+A) and copy (Ctrl+C) to clipboard",
-                key="copy_text_area"
-            )
-            
-            # Quick copy helper
-            if st.button("📝 Select All Text Helper"):
-                st.info("💡 Click in the text area above, then use Ctrl+A to select all, then Ctrl+C to copy!")
-        
-        with col2:
-            st.markdown("#### 💾 Download Options")
-            
-            # Generate filename with timestamp
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            
-            # Text download
-            st.download_button(
-                label="📄 Download as TXT",
-                data=st.session_state.generated_mom,
-                file_name=f"meeting_minutes_{timestamp}.txt",
-                mime="text/plain",
-                help="Download as plain text file"
-            )
-            
-            # Markdown download
-            st.download_button(
-                label="📝 Download as Markdown",
-                data=st.session_state.generated_mom,
-                file_name=f"meeting_minutes_{timestamp}.md",
-                mime="text/markdown",
-                help="Download as Markdown file with formatting"
-            )
-            
-            # JSON format for structured data
-            json_data = {
-                "generated_at": datetime.now().isoformat(),
-                "meeting_minutes": st.session_state.generated_mom,
-                "configuration": st.session_state.get('config', {}),
-                "transcript_segments": len(st.session_state.get('transcript_data', []))
-            }
-            
-            st.download_button(
-                label="📊 Download as JSON",
-                data=json.dumps(json_data, indent=2),
-                file_name=f"meeting_data_{timestamp}.json",
-                mime="application/json",
-                help="Download complete data including configuration"
-            )
-            
-            st.markdown("---")
-            st.success("✅ All download buttons are fully functional!")
-            
-            st.markdown("#### 🔮 Future Export Options")
-            st.info("""
-            **Coming in V2:**
-            - 📑 PDF export with professional formatting
-            - 📧 Direct email integration
-            - 📱 Mobile sharing options
-            - 🔗 Calendar meeting integration
-            - 📊 Analytics dashboard export
-            - 🌐 Direct upload to collaboration tools
-            """)
-        
-        # Usage statistics
-        st.markdown("---")
-        st.markdown("#### 📊 Session Statistics")
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            word_count = len(st.session_state.generated_mom.split())
-            st.metric("Words Generated", word_count)
-        
-        with col2:
-            if st.session_state.transcript_data:
-                transcript_duration = st.session_state.transcript_data[-1]['end_time']
-                st.metric("Meeting Duration", f"{format_time(transcript_duration)}")
-            else:
-                st.metric("Meeting Duration", "N/A")
-        
-        with col3:
-            if st.session_state.selected_transcript:
-                selected_words = len(st.session_state.selected_transcript.split())
-                st.metric("Transcript Words", selected_words)
-            else:
-                st.metric("Transcript Words", "N/A")
-        
-        with col4:
-            compression_ratio = round(word_count / len(st.session_state.selected_transcript.split()) * 100, 1) if st.session_state.selected_transcript else 0
-            st.metric("Compression Ratio", f"{compression_ratio}%")
-    
-    else:
-        st.info("👆 Generate a MoM first to see export options")
-
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style='text-align: center; color: #666; padding: 2rem 0;'>
-    <h4>🚀 AI MoM Assistant - Demo Version</h4>
-    <p>Transform your meeting recordings into professional documentation with AI</p>
-    <p><strong>Tech Stack:</strong> Streamlit • OpenAI Whisper • GPT-3.5 • Python</p>
-    <p><em>Built for demonstration purposes - Ready for production deployment</em></p>
-</div>
-""", unsafe_allow_html=True)
+                    with generation_container:
+                        st.info("🚀 Starting real MoM generation with OpenAI...")
+                        
+                        prompt = generate_mom_prompt(
+                            st.session_state.selected_transcript,
+                            config['context'],
+                            config['previous_meeting'],
+                            config['tone'],
+                            config['audience'],
+                            config['goal']
+                        )
+                        
+                        # Add custom instructions if provided
+                        if custom_instructions:
+                            prompt += f"\n\nADDITIONAL
