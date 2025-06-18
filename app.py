@@ -504,7 +504,7 @@ with tab4:
                     st.session_state.generated_mom = mock_generate_mom(prompt)
                 
                 st.success("✅ Minutes of Meeting generated successfully!")
-                st.experimental_rerun()
+                st.rerun()
         
         # Show generated MoM
         if st.session_state.generated_mom:
