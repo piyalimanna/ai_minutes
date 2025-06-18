@@ -97,7 +97,30 @@ def format_time(seconds):
 
 def mock_transcribe_audio(audio_file):
     """Mock transcription function - in real app, this would call OpenAI Whisper"""
-    time.sleep(2)  # Simulate API call delay
+    # Show that we're processing the actual file
+    st.info(f"📁 Processing file: {audio_file.name} ({audio_file.size} bytes)")
+    
+    # Simulate processing time based on file size
+    processing_time = min(5, max(2, audio_file.size / 1000000))  # 2-5 seconds based on file size
+    
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for i in range(100):
+        time.sleep(processing_time / 100)
+        progress_bar.progress(i + 1)
+        if i < 30:
+            status_text.text("🎵 Analyzing audio format...")
+        elif i < 60:
+            status_text.text("🔊 Processing audio segments...")
+        elif i < 90:
+            status_text.text("🤖 Generating transcript...")
+        else:
+            status_text.text("✨ Finalizing results...")
+    
+    status_text.text("✅ Transcription complete!")
+    time.sleep(0.5)  # Brief pause to show completion
+    
     return DEMO_TRANSCRIPT
 
 def generate_mom_prompt(transcript, context, previous_meeting, tone, audience, goal):
@@ -231,8 +254,9 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📋 Quick Actions")
     if st.button("🔄 Reset Session"):
-        for key in st.session_state.keys():
+        for key in list(st.session_state.keys()):
             del st.session_state[key]
+        st.success("✅ Session reset!")
         st.rerun()
     
     st.markdown("---")
@@ -264,20 +288,61 @@ with tab1:
         
         if uploaded_file is not None:
             st.success(f"✅ File uploaded: {uploaded_file.name}")
+            
+            # Show file details
+            file_details = {
+                "Filename": uploaded_file.name,
+                "File size": f"{uploaded_file.size / 1024 / 1024:.2f} MB",
+                "File type": uploaded_file.type
+            }
+            
+            for key, value in file_details.items():
+                st.write(f"**{key}:** {value}")
+            
             st.audio(uploaded_file)
             
-            if st.button("🔄 Transcribe Audio", type="primary"):
-                with st.spinner("Transcribing audio... This may take a few minutes."):
-                    st.session_state.transcript_data = mock_transcribe_audio(uploaded_file)
-                st.success("✅ Transcription completed!")
-                st.rerun()
+            # Transcription button with better state management
+            transcribe_button = st.button("🔄 Transcribe Audio", type="primary", key="transcribe_btn")
+            
+            if transcribe_button:
+                try:
+                    # Clear any previous transcript
+                    if 'transcript_data' in st.session_state:
+                        del st.session_state.transcript_data
+                    
+                    # Create a container for the transcription process
+                    transcription_container = st.container()
+                    
+                    with transcription_container:
+                        st.info("🎯 Starting transcription process...")
+                        
+                        # Call the mock transcription function
+                        st.session_state.transcript_data = mock_transcribe_audio(uploaded_file)
+                        
+                        # Success message
+                        st.success("✅ Transcription completed successfully!")
+                        st.balloons()
+                        
+                        # Auto-advance to transcript tab
+                        st.info("👉 Check the 'Transcript' tab to review your transcription!")
+                        
+                except Exception as e:
+                    st.error(f"❌ Transcription failed: {str(e)}")
+                    st.error("Please try uploading the file again or use the demo data.")
+        
+        else:
+            st.info("👆 Please upload an audio file to start transcription")
         
         # Demo data option
         st.markdown("---")
-        if st.button("📊 Load Demo Transcript", help="Load sample meeting transcript for testing"):
+        st.markdown("#### 🧪 Demo Mode")
+        demo_button = st.button("📊 Load Demo Transcript", help="Load sample meeting transcript for testing")
+        
+        if demo_button:
             st.session_state.transcript_data = DEMO_TRANSCRIPT
             st.success("✅ Demo transcript loaded!")
-            st.rerun()
+            st.info("👉 Go to the 'Transcript' tab to see the demo data!")
+            st.balloons()
     
     with col2:
         st.markdown("#### 🎙️ Record Audio")
@@ -439,7 +504,7 @@ with tab4:
                     st.session_state.generated_mom = mock_generate_mom(prompt)
                 
                 st.success("✅ Minutes of Meeting generated successfully!")
-                st.rerun()
+                st.experimental_rerun()
         
         # Show generated MoM
         if st.session_state.generated_mom:
