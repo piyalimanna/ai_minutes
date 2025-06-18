@@ -175,7 +175,26 @@ Format the output in a professional, easy-to-read structure appropriate for the 
 
 def mock_generate_mom(prompt):
     """Mock MoM generation - in real app, this would call OpenAI GPT"""
-    time.sleep(3)  # Simulate API call delay
+    
+    # Show progress during generation
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    steps = [
+        "🤖 Analyzing meeting transcript...",
+        "📝 Extracting key discussion points...",
+        "🎯 Identifying action items...",
+        "📋 Structuring meeting summary...",
+        "✨ Formatting final document..."
+    ]
+    
+    for i, step in enumerate(steps):
+        status_text.text(step)
+        progress_bar.progress((i + 1) * 20)
+        time.sleep(0.8)  # Slightly faster for better UX
+    
+    status_text.text("✅ Generation complete!")
+    time.sleep(0.3)
     
     # This is a mock response - in real app, you'd call OpenAI API
     mock_response = """
@@ -487,33 +506,60 @@ with tab4:
             include_sentiment = st.checkbox("Include Sentiment Analysis", value=False)
         
         # Generate MoM
-        if st.button("✨ Generate Minutes of Meeting", type="primary"):
+        generate_button = st.button("✨ Generate Minutes of Meeting", type="primary", key="generate_mom_btn")
+        
+        if generate_button:
             if not config['context']:
                 st.error("❌ Please provide meeting context in the Configuration tab")
             else:
-                prompt = generate_mom_prompt(
-                    st.session_state.selected_transcript,
-                    config['context'],
-                    config['previous_meeting'],
-                    config['tone'],
-                    config['audience'],
-                    config['goal']
-                )
+                # Create containers for the generation process
+                generation_container = st.container()
                 
-                with st.spinner("🤖 AI is generating your Minutes of Meeting..."):
-                    st.session_state.generated_mom = mock_generate_mom(prompt)
-                
-                st.success("✅ Minutes of Meeting generated successfully!")
-                st.rerun()
+                with generation_container:
+                    st.info("🚀 Starting MoM generation...")
+                    
+                    prompt = generate_mom_prompt(
+                        st.session_state.selected_transcript,
+                        config['context'],
+                        config['previous_meeting'],
+                        config['tone'],
+                        config['audience'],
+                        config['goal']
+                    )
+                    
+                    # Show progress during generation
+                    progress_container = st.container()
+                    with progress_container:
+                        st.session_state.generated_mom = mock_generate_mom(prompt)
+                    
+                    st.success("✅ Minutes of Meeting generated successfully!")
+                    st.balloons()
+                    
+                    # Force immediate display of results
+                    st.markdown("#### 📋 Your Generated Minutes of Meeting")
+                    st.markdown("---")
         
-        # Show generated MoM
+        # Always show generated MoM if it exists
         if st.session_state.generated_mom:
             st.markdown("#### 📋 Generated Minutes of Meeting")
-            st.markdown(f"""
-            <div class='mom-output'>
+            
+            # Create a nice container for the MoM
+            mom_container = st.container()
+            with mom_container:
+                st.markdown(f"""
+                <div class='mom-output'>
 {st.session_state.generated_mom}
-            </div>
-            """, unsafe_allow_html=True)
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Add a copy button for convenience
+                col1, col2 = st.columns([3, 1])
+                with col2:
+                    st.markdown("**Quick Actions:**")
+                    if st.button("📋 Copy Text", key="quick_copy"):
+                        st.info("💡 Text is displayed above - select and copy!")
+                    if st.button("📥 Go to Export", key="go_to_export"):
+                        st.info("👉 Check the 'Export' tab for download options!")
             
             # Refinement options
             st.markdown("#### 🔄 Refine Results")
