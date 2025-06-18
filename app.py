@@ -233,7 +233,7 @@ with st.sidebar:
     if st.button("🔄 Reset Session"):
         for key in st.session_state.keys():
             del st.session_state[key]
-        st.experimental_rerun()
+        st.rerun()
     
     st.markdown("---")
     st.markdown("### 📖 Instructions")
@@ -270,14 +270,14 @@ with tab1:
                 with st.spinner("Transcribing audio... This may take a few minutes."):
                     st.session_state.transcript_data = mock_transcribe_audio(uploaded_file)
                 st.success("✅ Transcription completed!")
-                st.experimental_rerun()
+                st.rerun()
         
         # Demo data option
         st.markdown("---")
         if st.button("📊 Load Demo Transcript", help="Load sample meeting transcript for testing"):
             st.session_state.transcript_data = DEMO_TRANSCRIPT
             st.success("✅ Demo transcript loaded!")
-            st.experimental_rerun()
+            st.rerun()
     
     with col2:
         st.markdown("#### 🎙️ Record Audio")
@@ -439,7 +439,7 @@ with tab4:
                     st.session_state.generated_mom = mock_generate_mom(prompt)
                 
                 st.success("✅ Minutes of Meeting generated successfully!")
-                st.experimental_rerun()
+                st.rerun()
         
         # Show generated MoM
         if st.session_state.generated_mom:
