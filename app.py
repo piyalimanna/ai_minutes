@@ -288,6 +288,51 @@ with st.sidebar:
     5. **Generate** MoM
     6. **Export** results
     """)
+    
+    # Workflow status checker
+    st.markdown("---")
+    st.markdown("### ✅ Workflow Status")
+    
+    # Check current progress
+    progress_items = []
+    if st.session_state.get('transcript_data'):
+        progress_items.append("✅ Transcript loaded")
+    else:
+        progress_items.append("⏳ Load transcript")
+    
+    if st.session_state.get('selected_transcript'):
+        progress_items.append("✅ Segment selected")
+    else:
+        progress_items.append("⏳ Select time range")
+    
+    if st.session_state.get('config', {}).get('context'):
+        progress_items.append("✅ Context configured")
+    else:
+        progress_items.append("⏳ Add meeting context")
+    
+    if st.session_state.get('generated_mom'):
+        progress_items.append("✅ MoM generated")
+        progress_items.append("✅ Ready to export")
+    else:
+        progress_items.append("⏳ Generate MoM")
+        progress_items.append("⏳ Export results")
+    
+    for item in progress_items:
+        st.markdown(f"- {item}")
+    
+    # Quick test button
+    if st.button("🧪 Quick Test Setup"):
+        st.session_state.transcript_data = DEMO_TRANSCRIPT
+        st.session_state.selected_transcript = "\n".join([f"[{format_time(s['start_time'])} - {format_time(s['end_time'])}] {s['text']}" for s in DEMO_TRANSCRIPT])
+        st.session_state.config = {
+            'context': 'Sprint review meeting to discuss development progress, client feedback, and next steps.',
+            'previous_meeting': '',
+            'audience': 'Project Team',
+            'goal': 'Review progress and plan next sprint',
+            'tone': 'Action-focused'
+        }
+        st.success("✅ Quick test setup complete!")
+        st.rerun()
 
 # Main content area with tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎤 Audio Input", "📝 Transcript", "⚙️ Configuration", "✨ Generate MoM", "📥 Export"])
@@ -365,14 +410,59 @@ with tab1:
     
     with col2:
         st.markdown("#### 🎙️ Record Audio")
-        st.info("🚧 Voice recording feature would be implemented using streamlit-webrtc in production")
+        
+        # Audio recording interface (placeholder for now)
+        st.info("🚧 **Live Recording Feature**")
         st.markdown("""
-        **In the full version:**
-        - Real-time voice recording
-        - Audio quality controls
-        - Recording duration limits
-        - Pause/resume functionality
+        **Status:** Available in full production version
+        
+        **Features:**
+        - 🎤 Real-time voice recording
+        - ⏯️ Pause/Resume controls
+        - 🔊 Audio quality settings
+        - ⏱️ Recording duration display
+        - 🎵 Live audio visualization
         """)
+        
+        # Mock recording interface
+        col_rec1, col_rec2 = st.columns(2)
+        with col_rec1:
+            if st.button("🔴 Start Recording", disabled=True):
+                st.info("Feature available in production version")
+        with col_rec2:
+            if st.button("⏹️ Stop Recording", disabled=True):
+                st.info("Would stop recording and auto-transcribe")
+        
+        # Recording implementation guide
+        with st.expander("🔧 Implementation Guide"):
+            st.code("""
+# To enable real recording, install:
+pip install streamlit-webrtc
+
+# Then add this code:
+from streamlit_webrtc import webrtc_streamer
+import av
+
+def audio_frame_callback(frame):
+    # Process audio frames
+    return frame
+
+webrtc_streamer(
+    key="audio",
+    mode=WebRtcMode.SENDONLY,
+    audio_frame_callback=audio_frame_callback,
+    media_stream_constraints={
+        "video": False,
+        "audio": True,
+    }
+)
+            """)
+        
+        st.markdown("---")
+        st.markdown("**💡 For now, use:**")
+        st.markdown("- 📁 Audio file upload (fully working)")
+        st.markdown("- 📊 Demo transcript (for testing)")
+        st.markdown("- 🎵 Any MP3/WAV file you have")
 
 with tab2:
     st.markdown("<h3 class='section-header'>Transcript Review</h3>", unsafe_allow_html=True)
@@ -593,45 +683,76 @@ with tab5:
     st.markdown("<h3 class='section-header'>Export Results</h3>", unsafe_allow_html=True)
     
     if st.session_state.generated_mom:
+        st.success("🎉 **MoM Generated Successfully!** All export options are now available.")
+        
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("#### 📋 Copy to Clipboard")
             st.text_area(
-                "Generated MoM (Copy this text)",
+                "Generated MoM (Select all text and copy)",
                 value=st.session_state.generated_mom,
-                height=200,
-                help="Select all text and copy to clipboard"
+                height=300,
+                help="Select all text (Ctrl+A) and copy (Ctrl+C) to clipboard",
+                key="copy_text_area"
             )
+            
+            # Quick copy helper
+            if st.button("📝 Select All Text Helper"):
+                st.info("💡 Click in the text area above, then use Ctrl+A to select all, then Ctrl+C to copy!")
         
         with col2:
             st.markdown("#### 💾 Download Options")
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             
             # Text download
             st.download_button(
                 label="📄 Download as TXT",
                 data=st.session_state.generated_mom,
-                file_name=f"meeting_minutes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain"
+                file_name=f"meeting_minutes_{timestamp}.txt",
+                mime="text/plain",
+                help="Download as plain text file"
             )
             
             # Markdown download
             st.download_button(
                 label="📝 Download as Markdown",
                 data=st.session_state.generated_mom,
-                file_name=f"meeting_minutes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md",
-                mime="text/markdown"
+                file_name=f"meeting_minutes_{timestamp}.md",
+                mime="text/markdown",
+                help="Download as Markdown file with formatting"
+            )
+            
+            # JSON format for structured data
+            json_data = {
+                "generated_at": datetime.now().isoformat(),
+                "meeting_minutes": st.session_state.generated_mom,
+                "configuration": st.session_state.get('config', {}),
+                "transcript_segments": len(st.session_state.get('transcript_data', []))
+            }
+            
+            st.download_button(
+                label="📊 Download as JSON",
+                data=json.dumps(json_data, indent=2),
+                file_name=f"meeting_data_{timestamp}.json",
+                mime="application/json",
+                help="Download complete data including configuration"
             )
             
             st.markdown("---")
+            st.success("✅ All download buttons are fully functional!")
+            
             st.markdown("#### 🔮 Future Export Options")
             st.info("""
             **Coming in V2:**
-            - 📑 PDF export with formatting
-            - 📧 Email integration
-            - 📱 Mobile sharing
-            - 🔗 Calendar integration
-            - 📊 Analytics dashboard
+            - 📑 PDF export with professional formatting
+            - 📧 Direct email integration
+            - 📱 Mobile sharing options
+            - 🔗 Calendar meeting integration
+            - 📊 Analytics dashboard export
+            - 🌐 Direct upload to collaboration tools
             """)
         
         # Usage statistics
