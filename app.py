@@ -351,12 +351,6 @@ with st.sidebar:
     6. **Generate** MoM
     7. **Export** results
     """)
-    st.markdown("### 📋 Quick Actions")
-    if st.button("🔄 Reset Session"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-        st.success("✅ Session reset!")
-        st.rerun()
 
     st.markdown("---")
     st.markdown("### 📖 Instructions")
