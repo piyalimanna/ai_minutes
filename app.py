@@ -292,8 +292,8 @@ st.markdown("<h1 class='main-header'>🤖 AI MoM Assistant</h1>", unsafe_allow_h
 st.markdown("<p style='text-align: center; color: #666;'>Transform meeting recordings into professional Minutes of Meeting with AI</p>", unsafe_allow_html=True)
 
 # Sidebar for API Configuration
-    deepgram_key = st.text_input("Deepgram API Key", type="password", help="Optional: Use Deepgram for transcription")
-    st.session_state.deepgram_key_set = bool(deepgram_key)
+    # deepgram_key = st.text_input("Deepgram API Key", type="password", help="Optional: Use Deepgram for transcription")
+    # st.session_state.deepgram_key_set = bool(deepgram_key)
 
 
 # Sidebar for API Configuration
@@ -423,94 +423,94 @@ uploaded_file = st.file_uploader(
             help="Upload meeting recording in MP3, WAV, M4A, OGG, or FLAC format"
         )
         
-        if uploaded_file is not None:
-            st.success(f"✅ File uploaded: {uploaded_file.name}")
-            
-            # Show file details
-            file_details = {
-                "Filename": uploaded_file.name,
-                "File size": f"{uploaded_file.size / 1024 / 1024:.2f} MB",
-                "File type": uploaded_file.type
-            }
-            
-            for key, value in file_details.items():
-                st.write(f"**{key}:** {value}")
-            
-            # Show audio player
-            st.audio(uploaded_file)
-            
-            # File size warning
-            if uploaded_file.size > 25 * 1024 * 1024:  # 25MB limit for OpenAI
-                st.warning("⚠️ File size exceeds 25MB. OpenAI Whisper has a 25MB limit. Consider compressing your audio file.")
-            
-            # Transcription button
-            transcribe_button = st.button("🔄 Transcribe Audio", type="primary", key="transcribe_btn")
-            
-            if transcribe_button:
-                try:
-                    # Clear any previous transcript
-                    if 'transcript_data' in st.session_state:
-                        del st.session_state.transcript_data
-                    
-                    # Create a container for the transcription process
-                    transcription_container = st.container()
-                    
-                    with transcription_container:
-                        st.info("🎯 Starting real transcription with OpenAI Whisper...")
-                        
-                        # Call the real transcription function
-                        transcript_result = transcribe_audio_real(uploaded_file, api_key)
-                        
-                        if transcript_result:
-                            st.session_state.transcript_data = transcript_result
-                            st.success("✅ Transcription completed successfully!")
-                            st.balloons()
-                            
-                            # Show quick preview
-                            st.markdown("**📋 Preview:**")
-                            preview_text = transcript_result[0]['text'][:200] + "..." if len(transcript_result[0]['text']) > 200 else transcript_result[0]['text']
-                            st.info(f"First segment: {preview_text}")
-                            
-                            # Auto-advance to transcript tab
-                            st.info("👉 Check the 'Transcript' tab to review your transcription!")
-                        else:
-                            st.error("❌ Transcription failed. Please check your API key and try again.")
-                        
-                except Exception as e:
-                    st.error(f"❌ Transcription failed: {str(e)}")
-                    st.error("Please check your API key and try again.")
+    if uploaded_file is not None:
+        st.success(f"✅ File uploaded: {uploaded_file.name}")
         
-        else:
-            st.info("👆 Please upload an audio file to start transcription")
+        # Show file details
+        file_details = {
+            "Filename": uploaded_file.name,
+            "File size": f"{uploaded_file.size / 1024 / 1024:.2f} MB",
+            "File type": uploaded_file.type
+        }
+        
+        for key, value in file_details.items():
+            st.write(f"**{key}:** {value}")
+        
+        # Show audio player
+        st.audio(uploaded_file)
+        
+        # File size warning
+        if uploaded_file.size > 25 * 1024 * 1024:  # 25MB limit for OpenAI
+            st.warning("⚠️ File size exceeds 25MB. OpenAI Whisper has a 25MB limit. Consider compressing your audio file.")
+        
+        # Transcription button
+        transcribe_button = st.button("🔄 Transcribe Audio", type="primary", key="transcribe_btn")
+        
+        if transcribe_button:
+            try:
+                # Clear any previous transcript
+                if 'transcript_data' in st.session_state:
+                    del st.session_state.transcript_data
+                
+                # Create a container for the transcription process
+                transcription_container = st.container()
+                
+                with transcription_container:
+                    st.info("🎯 Starting real transcription with OpenAI Whisper...")
+                    
+                    # Call the real transcription function
+                    transcript_result = transcribe_audio_real(uploaded_file, api_key)
+                    
+                    if transcript_result:
+                        st.session_state.transcript_data = transcript_result
+                        st.success("✅ Transcription completed successfully!")
+                        st.balloons()
+                        
+                        # Show quick preview
+                        st.markdown("**📋 Preview:**")
+                        preview_text = transcript_result[0]['text'][:200] + "..." if len(transcript_result[0]['text']) > 200 else transcript_result[0]['text']
+                        st.info(f"First segment: {preview_text}")
+                        
+                        # Auto-advance to transcript tab
+                        st.info("👉 Check the 'Transcript' tab to review your transcription!")
+                    else:
+                        st.error("❌ Transcription failed. Please check your API key and try again.")
+                    
+            except Exception as e:
+                st.error(f"❌ Transcription failed: {str(e)}")
+                st.error("Please check your API key and try again.")
     
-    with col2:
-        st.markdown("#### 🎙️ Live Recording")
+    else:
+        st.info("👆 Please upload an audio file to start transcription")
+
+with col2:
+    st.markdown("#### 🎙️ Live Recording")
+    
+    # Audio recording interface (placeholder for now)
+    st.info("🚧 **Live Recording Feature**")
+    st.markdown("""
+    **Status:** Available in advanced implementation
+    
+    **Features:**
+    - 🎤 Real-time voice recording
+    - ⏯️ Pause/Resume controls
+    - 🔊 Audio quality settings
+    - ⏱️ Recording duration display
+    - 🎵 Live audio visualization
+    """)
         
-        # Audio recording interface (placeholder for now)
-        st.info("🚧 **Live Recording Feature**")
-        st.markdown("""
-        **Status:** Available in advanced implementation
-        
-        **Features:**
-        - 🎤 Real-time voice recording
-        - ⏯️ Pause/Resume controls
-        - 🔊 Audio quality settings
-        - ⏱️ Recording duration display
-        - 🎵 Live audio visualization
-        """)
-        
-        # Mock recording interface
-        col_rec1, col_rec2 = st.columns(2)
-        with col_rec1:
-            if st.button("🔴 Start Recording", disabled=True):
-                st.info("Feature available in advanced version")
-        with col_rec2:
-            if st.button("⏹️ Stop Recording", disabled=True):
-                st.info("Would record and auto-transcribe")
-        
-        # Recording implementation guide
-        with st.expander("🔧 Implementation Guide"):
-            st.code("""
+    # Mock recording interface
+    col_rec1, col_rec2 = st.columns(2)
+    with col_rec1:
+        if st.button("🔴 Start Recording", disabled=True):
+            st.info("Feature available in advanced version")
+    with col_rec2:
+        if st.button("⏹️ Stop Recording", disabled=True):
+            st.info("Would record and auto-transcribe")
+    
+    # Recording implementation guide
+    with st.expander("🔧 Implementation Guide"):
+        st.code("""
 # To enable real recording, install:
 pip install streamlit-webrtc pyaudio
 
