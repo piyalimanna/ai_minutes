@@ -8,6 +8,8 @@ import re
 import time
 import tempfile
 import os
+from deepgram import Deepgram
+
 
 # Page configuration
 st.set_page_config(
@@ -150,6 +152,35 @@ def transcribe_audio_real(audio_file, api_key):
         st.error(f"Transcription Error: {str(e)}")
         return None
 
+
+def transcribe_audio_deepgram(audio_file, deepgram_key):
+    try:
+        dg_client = Deepgram(deepgram_key)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
+            tmp_file.write(audio_file.read())
+            tmp_file_path = tmp_file.name
+
+        with open(tmp_file_path, "rb") as f:
+            source = {"buffer": f, "mimetype": "audio/mp3"}
+            response = dg_client.transcription.sync_prerecorded(source, {
+                "punctuate": True,
+                "paragraphs": True
+            })
+
+        segments = []
+        for para in response["results"]["channels"][0]["alternatives"][0]["paragraphs"]["paragraphs"]:
+            segments.append({
+                "start_time": para["start"],
+                "end_time": para["end"],
+                "text": para["sentences"][0]["text"]
+            })
+
+        return segments
+    except Exception as e:
+        st.error(f"Deepgram Transcription Error: {str(e)}")
+        return None
+
+
 def generate_mom_prompt(transcript, context, previous_meeting, tone, audience, goal):
     """Generate the prompt for MoM creation"""
     
@@ -261,6 +292,9 @@ st.markdown("<h1 class='main-header'>🤖 AI MoM Assistant</h1>", unsafe_allow_h
 st.markdown("<p style='text-align: center; color: #666;'>Transform meeting recordings into professional Minutes of Meeting with AI</p>", unsafe_allow_html=True)
 
 # Sidebar for API Configuration
+    deepgram_key = st.text_input("Deepgram API Key", type="password", help="Optional: Use Deepgram for transcription")
+    st.session_state.deepgram_key_set = bool(deepgram_key)
+
 with st.sidebar:
     st.markdown("### ⚙️ Configuration")
     
@@ -363,7 +397,10 @@ with tab1:
     
     with col1:
         st.markdown("#### 📁 Upload Audio File")
-        uploaded_file = st.file_uploader(
+        
+    provider = st.radio("Choose Transcription Provider", ["OpenAI", "Deepgram"])
+
+uploaded_file = st.file_uploader(
             "Choose an audio file",
             type=['mp3', 'wav', 'm4a', 'ogg', 'flac'],
             help="Upload meeting recording in MP3, WAV, M4A, OGG, or FLAC format"
