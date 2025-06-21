@@ -406,65 +406,65 @@ uploaded_file = st.file_uploader(
             help="Upload meeting recording in MP3, WAV, M4A, OGG, or FLAC format"
         )
         
-        if uploaded_file is not None:
-            st.success(f"✅ File uploaded: {uploaded_file.name}")
+if uploaded_file is not None:
+    st.success(f"✅ File uploaded: {uploaded_file.name}")
+    
+    # Show file details
+    file_details = {
+        "Filename": uploaded_file.name,
+        "File size": f"{uploaded_file.size / 1024 / 1024:.2f} MB",
+        "File type": uploaded_file.type
+    }
+    
+    for key, value in file_details.items():
+        st.write(f"**{key}:** {value}")
+    
+    # Show audio player
+    st.audio(uploaded_file)
+    
+    # File size warning
+    if uploaded_file.size > 25 * 1024 * 1024:  # 25MB limit for OpenAI
+        st.warning("⚠️ File size exceeds 25MB. OpenAI Whisper has a 25MB limit. Consider compressing your audio file.")
+    
+    # Transcription button
+    transcribe_button = st.button("🔄 Transcribe Audio", type="primary", key="transcribe_btn")
+    
+    if transcribe_button:
+        try:
+            # Clear any previous transcript
+            if 'transcript_data' in st.session_state:
+                del st.session_state.transcript_data
             
-            # Show file details
-            file_details = {
-                "Filename": uploaded_file.name,
-                "File size": f"{uploaded_file.size / 1024 / 1024:.2f} MB",
-                "File type": uploaded_file.type
-            }
+            # Create a container for the transcription process
+            transcription_container = st.container()
             
-            for key, value in file_details.items():
-                st.write(f"**{key}:** {value}")
-            
-            # Show audio player
-            st.audio(uploaded_file)
-            
-            # File size warning
-            if uploaded_file.size > 25 * 1024 * 1024:  # 25MB limit for OpenAI
-                st.warning("⚠️ File size exceeds 25MB. OpenAI Whisper has a 25MB limit. Consider compressing your audio file.")
-            
-            # Transcription button
-            transcribe_button = st.button("🔄 Transcribe Audio", type="primary", key="transcribe_btn")
-            
-            if transcribe_button:
-                try:
-                    # Clear any previous transcript
-                    if 'transcript_data' in st.session_state:
-                        del st.session_state.transcript_data
+            with transcription_container:
+                st.info("🎯 Starting real transcription with OpenAI Whisper...")
+                
+                # Call the real transcription function
+                transcript_result = transcribe_audio_real(uploaded_file, api_key)
+                
+                if transcript_result:
+                    st.session_state.transcript_data = transcript_result
+                    st.success("✅ Transcription completed successfully!")
+                    st.balloons()
                     
-                    # Create a container for the transcription process
-                    transcription_container = st.container()
+                    # Show quick preview
+                    st.markdown("**📋 Preview:**")
+                    preview_text = transcript_result[0]['text'][:200] + "..." if len(transcript_result[0]['text']) > 200 else transcript_result[0]['text']
+                    st.info(f"First segment: {preview_text}")
                     
-                    with transcription_container:
-                        st.info("🎯 Starting real transcription with OpenAI Whisper...")
-                        
-                        # Call the real transcription function
-                        transcript_result = transcribe_audio_real(uploaded_file, api_key)
-                        
-                        if transcript_result:
-                            st.session_state.transcript_data = transcript_result
-                            st.success("✅ Transcription completed successfully!")
-                            st.balloons()
-                            
-                            # Show quick preview
-                            st.markdown("**📋 Preview:**")
-                            preview_text = transcript_result[0]['text'][:200] + "..." if len(transcript_result[0]['text']) > 200 else transcript_result[0]['text']
-                            st.info(f"First segment: {preview_text}")
-                            
-                            # Auto-advance to transcript tab
-                            st.info("👉 Check the 'Transcript' tab to review your transcription!")
-                        else:
-                            st.error("❌ Transcription failed. Please check your API key and try again.")
-                        
-                except Exception as e:
-                    st.error(f"❌ Transcription failed: {str(e)}")
-                    st.error("Please check your API key and try again.")
-        
-        else:
-            st.info("👆 Please upload an audio file to start transcription")
+                    # Auto-advance to transcript tab
+                    st.info("👉 Check the 'Transcript' tab to review your transcription!")
+                else:
+                    st.error("❌ Transcription failed. Please check your API key and try again.")
+                
+        except Exception as e:
+            st.error(f"❌ Transcription failed: {str(e)}")
+            st.error("Please check your API key and try again.")
+
+else:
+    st.info("👆 Please upload an audio file to start transcription")
     
     with col2:
         st.markdown("#### 🎙️ Live Recording")
