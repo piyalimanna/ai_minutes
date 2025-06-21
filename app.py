@@ -514,7 +514,7 @@ with tab1:
                             st.success("✅ Transcription completed successfully!")
                             st.balloons()
                             # Rest of success logic...
-                            Show quick preview
+                            # Show quick preview
                             st.markdown("**📋 Preview:**")
                             preview_text = transcript_result[0]['text'][:200] + "..." if len(transcript_result[0]['text']) > 200 else transcript_result[0]['text']
                             st.info(f"First segment: {preview_text}")
