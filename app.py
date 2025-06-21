@@ -317,6 +317,9 @@ with st.sidebar:
     elif provider == "Deepgram":
         deepgram_key = st.text_input("Deepgram API Key", type="password", help="Required for Deepgram transcription")
         st.session_state.deepgram_key_set = bool(deepgram_key)
+        st.session_state.deepgram_key = deepgram_key  # Store the key in session state
+        if deepgram_key:
+            st.success("🔑 Deepgram API Key validated successfully")
         api_key = deepgram_key  # For compatibility
 
     provider = st.session_state.get('provider', 'OpenAI')
@@ -407,9 +410,17 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["🎤 Audio Input", "📝 Transcript", "
 with tab1:
     st.markdown("<h3 class='section-header'>Audio Input</h3>", unsafe_allow_html=True)
 
-    if not st.session_state.api_key_set:
-        st.error("🚨 **OpenAI API Key Required**")
-        st.markdown("Please enter your OpenAI API key in the sidebar to proceed.")
+    provider = st.session_state.get('provider', 'OpenAI')
+    api_key_valid = False
+    
+    if provider == "OpenAI" and st.session_state.get('api_key_set', False):
+        api_key_valid = True
+    elif provider == "Deepgram" and st.session_state.get('deepgram_key_set', False):
+        api_key_valid = True
+    
+    if not api_key_valid:
+        st.error(f"🚨 **{provider} API Key Required**")
+        st.markdown(f"Please enter your {provider} API key in the sidebar to proceed.")
         st.stop()
 
     col1, col2 = st.columns(2)
@@ -718,9 +729,17 @@ with tab3:
 with tab4:
     st.markdown("<h3 class='section-header'>Generate Minutes of Meeting</h3>", unsafe_allow_html=True)
 
-    if not st.session_state.api_key_set:
-        st.error("🚨 **OpenAI API Key Required**")
-        st.markdown("Please enter your OpenAI API key in the sidebar to proceed.")
+    provider = st.session_state.get('provider', 'OpenAI')
+    api_key_valid = False
+    
+    if provider == "OpenAI" and st.session_state.get('api_key_set', False):
+        api_key_valid = True
+    elif provider == "Deepgram" and st.session_state.get('deepgram_key_set', False):
+        api_key_valid = True
+    
+    if not api_key_valid:
+        st.error(f"🚨 **{provider} API Key Required**")
+        st.markdown(f"Please enter your {provider} API key in the sidebar to proceed.")
         st.stop()
 
     if st.session_state.selected_transcript and hasattr(st.session_state, 'config'):
