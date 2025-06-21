@@ -292,8 +292,8 @@ st.markdown("<h1 class='main-header'>🤖 AI MoM Assistant</h1>", unsafe_allow_h
 st.markdown("<p style='text-align: center; color: #666;'>Transform meeting recordings into professional Minutes of Meeting with AI</p>", unsafe_allow_html=True)
 
 # Sidebar for API Configuration
-    deepgram_key = st.text_input("Deepgram API Key", type="password", help="Optional: Use Deepgram for transcription")
-    st.session_state.deepgram_key_set = bool(deepgram_key)
+deepgram_key = st.text_input("Deepgram API Key", type="password", help="Optional: Use Deepgram for transcription")
+st.session_state.deepgram_key_set = bool(deepgram_key)
 
 with st.sidebar:
     st.markdown("### ⚙️ Configuration")
