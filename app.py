@@ -492,7 +492,6 @@ with tab1:
                     else:
                         st.error("Please configure API key first")
                         st.stop()
-                try:
                     # Clear any previous transcript
                     if 'transcript_data' in st.session_state:
                         del st.session_state.transcript_data
